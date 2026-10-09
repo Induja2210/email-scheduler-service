@@ -4,6 +4,8 @@
 
 A full-stack email scheduling system that allows users to compose, schedule, and automatically send emails at a specified date and time.
 
+🔗 **Live Demo:** [reachinbox-assignment-dun.vercel.app](https://reachinbox-assignment-dun.vercel.app/)
+
 ## 🚀 Features
 
 * User login interface
@@ -40,6 +42,10 @@ A full-stack email scheduling system that allows users to compose, schedule, and
 * Gmail SMTP
 * Nodemailer
 * Gmail App Password
+
+### Deployment
+
+* Vercel
 
 ## 📁 Project Structure
 
