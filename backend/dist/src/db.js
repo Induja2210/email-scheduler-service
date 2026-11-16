@@ -4,6 +4,12 @@ require("dotenv/config");
 const client_1 = require("../generated/prisma/client");
 const adapter_pg_1 = require("@prisma/adapter-pg");
 const connectionString = process.env.DATABASE_URL;
-const adapter = new adapter_pg_1.PrismaPg({ connectionString });
+if (!connectionString) {
+    throw new Error("DATABASE_URL is not set");
+}
+const adapter = new adapter_pg_1.PrismaPg({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+});
 const prisma = new client_1.PrismaClient({ adapter });
 exports.default = prisma;
