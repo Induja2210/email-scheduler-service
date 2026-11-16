@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import './App.css'
 
-const API = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5001'}/api/emails`
+const API = `${import.meta.env.VITE_API_URL ?? 'https://email-scheduler-service-qirx.onrender.com'}/api/emails`
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false)
