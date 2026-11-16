@@ -3,6 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+process.on("uncaughtException", (e) => { console.error("UNCAUGHT:", e); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.error("REJECTION:", e); process.exit(1); });
+console.log("BOOT: server.ts starting");
 const emailRoutes_1 = __importDefault(require("./routes/emailRoutes"));
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
