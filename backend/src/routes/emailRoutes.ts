@@ -72,6 +72,18 @@ router.post("/schedule", async (req, res) => {
       });
     }
 
+    if (scheduledDate <= new Date()) {
+      return res.status(400).json({
+        message: "Scheduled time must be in the future",
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      return res.status(400).json({
+        message: "Invalid recipient email",
+      });
+    }
+
     // Save email to database
     const email = await prisma.email.create({
       data: {
@@ -127,6 +139,24 @@ router.get("/sent", async (req, res) => {
     res.status(500).json({
       message: "Failed to fetch sent emails",
     });
+  }
+});
+
+// Cancel a scheduled email
+router.delete("/:id", async (req, res) => {
+  try {
+    const result = await prisma.email.deleteMany({
+      where: { id: req.params.id, status: "SCHEDULED" },
+    });
+
+    if (result.count === 0) {
+      return res.status(400).json({ message: "Cannot cancel this email" });
+    }
+
+    res.status(200).json({ message: "Email cancelled" });
+  } catch (error) {
+    console.error("Failed to cancel email:", error);
+    res.status(500).json({ message: "Failed to cancel email" });
   }
 });
 

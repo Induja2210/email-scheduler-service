@@ -290,3 +290,24 @@ body {
   cursor: pointer;
   font-size: 14px;
 }
+
+.email-card { text-align: left; }
+.email-card-header { display: flex; justify-content: space-between; align-items: center; }
+.email-card .meta { color: #666; font-size: 14px; margin: 4px 0; text-align: left; }
+.email-card .email-body { color: #888; font-size: 13px; text-align: left; }
+
+.badge { padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge.scheduled { background: #fef3c7; color: #d97706; }
+.badge.sent { background: #dcfce7; color: #16a34a; }
+.badge.failed { background: #fee2e2; color: #dc2626; }
+.badge.cancelled { background: #f3f4f6; color: #6b7280; }
+
+.cancel-email { margin-top: 8px; padding: 4px 12px; cursor: pointer; }
+
+.schedule-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.email-card {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+.email-card:last-child { border-bottom: none; }

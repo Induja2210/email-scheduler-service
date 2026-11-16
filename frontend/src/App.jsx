@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
 import './App.css'
+
+const API = 'http://localhost:5001/api/emails'
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false)
@@ -13,97 +16,95 @@ function App() {
 
   const [scheduledEmails, setScheduledEmails] = useState([])
   const [sentEmails, setSentEmails] = useState([])
+  const [loading, setLoading] = useState(false)
 
   const userId = '37261c7b-2bcb-4f9e-bddc-e89bf90528af'
   const senderId = 'f118cd9c-76e9-4154-9e3a-93a0dead8fea'
 
-  // Fetch scheduled emails
+  // ---------- Validation ----------
+  const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+  const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16)
+
+  const valid =
+    isEmail(sender) &&
+    isEmail(recipient) &&
+    subject.trim() !== '' &&
+    body.trim() !== '' &&
+    scheduledAt !== '' &&
+    new Date(scheduledAt) > new Date()
+
+  // ---------- Fetching ----------
   const fetchScheduledEmails = async () => {
+    setLoading(true)
     try {
-      const response = await fetch(
-        `http://localhost:5001/api/emails/scheduled?userId=${userId}`
-      )
-
+      const response = await fetch(`${API}/scheduled?userId=${userId}`)
       const data = await response.json()
-
       if (!response.ok) {
         console.error(data.message)
         return
       }
-
       setScheduledEmails(data)
     } catch (error) {
       console.error('Failed to fetch scheduled emails:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Fetch sent emails
   const fetchSentEmails = async () => {
+    setLoading(true)
     try {
-      const response = await fetch(
-        `http://localhost:5001/api/emails/sent?userId=${userId}`
-      )
-
+      const response = await fetch(`${API}/sent?userId=${userId}`)
       const data = await response.json()
-
       if (!response.ok) {
         console.error(data.message)
         return
       }
-
       setSentEmails(data)
     } catch (error) {
       console.error('Failed to fetch sent emails:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Fetch emails when user logs in or changes tab
   useEffect(() => {
     if (!loggedIn) return
-
-    if (activeTab === 'Scheduled') {
-      fetchScheduledEmails()
-    }
-
-    if (activeTab === 'Sent') {
-      fetchSentEmails()
-    }
+    if (activeTab === 'Scheduled') fetchScheduledEmails()
+    if (activeTab === 'Sent') fetchSentEmails()
   }, [loggedIn, activeTab])
 
-  // Schedule email
+  // ---------- Actions ----------
   const handleScheduleEmail = async () => {
-    if (!sender || !recipient || !subject || !body || !scheduledAt) {
-      alert('Please fill in all fields')
+    if (!valid) {
+      toast.error('Please fill in all fields with a valid future time')
       return
     }
 
     try {
-      const response = await fetch(
-        'http://localhost:5001/api/emails/schedule',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId,
-            senderId,
-            recipient,
-            subject,
-            body,
-            scheduledAt,
-          }),
-        }
-      )
+      const response = await fetch(`${API}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          senderId,
+          recipient,
+          subject,
+          body,
+          scheduledAt: new Date(scheduledAt).toISOString(),
+        }),
+      })
 
       const data = await response.json()
 
       if (!response.ok) {
-        alert(data.message || 'Failed to schedule email')
+        toast.error(data.message || 'Failed to schedule email')
         return
       }
 
-      alert('Email scheduled successfully!')
+      toast.success('Email scheduled')
 
       setSender('')
       setRecipient('')
@@ -112,15 +113,61 @@ function App() {
       setScheduledAt('')
 
       await fetchScheduledEmails()
-
       setActiveTab('Scheduled')
     } catch (error) {
       console.error(error)
-      alert('Could not connect to the backend')
+      toast.error('Could not connect to the backend')
     }
   }
 
-  // Login screen
+  const handleCancel = async (id) => {
+    try {
+      const response = await fetch(`${API}/${id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        toast.error('Could not cancel')
+        return
+      }
+      toast.success('Cancelled')
+      fetchScheduledEmails()
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not connect to the backend')
+    }
+  }
+
+  // ---------- Reusable card ----------
+  const renderCard = (email, timeLabel, timeValue, canCancel) => (
+    <div className="email-card" key={email.id}>
+      <div className="email-card-header">
+        <strong>{email.subject}</strong>
+        <span className={`badge ${String(email.status).toLowerCase()}`}>
+          {email.status}
+        </span>
+      </div>
+
+      <p className="meta">
+        <strong>To:</strong> {email.recipient} · <strong>From:</strong>{' '}
+        {email.sender?.email ?? email.senderId}
+      </p>
+
+      <p className="meta">
+        <strong>{timeLabel}:</strong>{' '}
+        {timeValue ? new Date(timeValue).toLocaleString() : 'N/A'}
+      </p>
+
+      <p className="email-body">
+        {email.body.length > 120 ? email.body.slice(0, 120) + '…' : email.body}
+      </p>
+
+      {canCancel && email.status === 'SCHEDULED' && (
+        <button className="cancel-email" onClick={() => handleCancel(email.id)}>
+          Cancel
+        </button>
+      )}
+    </div>
+  )
+
+  // ---------- Login screen ----------
   if (!loggedIn) {
     return (
       <div className="login-page">
@@ -136,20 +183,10 @@ function App() {
             <span>or login with email</span>
           </div>
 
-          <input
-            type="email"
-            placeholder="Email ID"
-          />
+          <input type="email" placeholder="Email ID" />
+          <input type="password" placeholder="Password" />
 
-          <input
-            type="password"
-            placeholder="Password"
-          />
-
-          <button
-            className="login-button"
-            onClick={() => setLoggedIn(true)}
-          >
+          <button className="login-button" onClick={() => setLoggedIn(true)}>
             Login
           </button>
         </div>
@@ -159,6 +196,7 @@ function App() {
 
   return (
     <div className="app">
+      <Toaster />
 
       {/* Sidebar */}
       <aside className="sidebar">
@@ -166,7 +204,6 @@ function App() {
 
         <div className="user-box">
           <div className="avatar">A</div>
-
           <div>
             <strong>Admin</strong>
             <p>admin@example.com</p>
@@ -189,18 +226,13 @@ function App() {
           </button>
         </nav>
 
-        <button
-          className="logout-button"
-          onClick={() => setLoggedIn(false)}
-        >
+        <button className="logout-button" onClick={() => setLoggedIn(false)}>
           Logout
         </button>
       </aside>
 
       {/* Main Content */}
       <main className="main-content">
-
-        {/* Compose Screen */}
         {activeTab === 'Compose' ? (
           <>
             <header className="top-header">
@@ -219,7 +251,6 @@ function App() {
 
             <section className="compose-section">
               <div className="compose-form">
-
                 <label>Sender</label>
                 <input
                   type="email"
@@ -255,6 +286,7 @@ function App() {
                 <label>Schedule Date & Time</label>
                 <input
                   type="datetime-local"
+                  min={nowLocal}
                   value={scheduledAt}
                   onChange={(e) => setScheduledAt(e.target.value)}
                 />
@@ -262,16 +294,15 @@ function App() {
                 <button
                   className="schedule-button"
                   onClick={handleScheduleEmail}
+                  disabled={!valid}
                 >
                   Schedule Email
                 </button>
-
               </div>
             </section>
           </>
         ) : (
           <>
-            {/* Dashboard Header */}
             <header className="top-header">
               <div>
                 <h1>{activeTab} Emails</h1>
@@ -286,153 +317,65 @@ function App() {
               </button>
             </header>
 
-            {/* Email List */}
             <section className="email-section">
-
-              {/* SCHEDULED EMAILS */}
+              {/* SCHEDULED */}
               {activeTab === 'Scheduled' && (
                 <>
                   <div className="section-header">
                     <h2>Scheduled Emails</h2>
-
-                    <span>
-                      {scheduledEmails.length} emails
-                    </span>
+                    <span>{scheduledEmails.length} emails</span>
                   </div>
 
-                  {scheduledEmails.length === 0 ? (
+                  {loading ? (
+                    <div className="empty-state">
+                      <p>Loading…</p>
+                    </div>
+                  ) : scheduledEmails.length === 0 ? (
                     <div className="empty-state">
                       <div className="empty-icon">📭</div>
-
                       <h3>No scheduled emails</h3>
-
-                      <p>
-                        Your scheduled emails will appear here.
-                      </p>
+                      <p>Your scheduled emails will appear here.</p>
                     </div>
                   ) : (
                     <div className="email-list">
-
-                      {scheduledEmails.map((email) => (
-                        <div
-                          className="email-card"
-                          key={email.id}
-                        >
-
-                          <div className="email-card-header">
-                            <strong>
-                              {email.subject}
-                            </strong>
-
-                            <span>
-                              {email.status}
-                            </span>
-                          </div>
-
-                          <p>
-                            <strong>To:</strong>{' '}
-                            {email.recipient}
-                          </p>
-
-                          <p>
-                            <strong>From:</strong>{' '}
-                            {email.senderId}
-                          </p>
-
-                          <p>
-                            <strong>Scheduled:</strong>{' '}
-                            {new Date(
-                              email.scheduledAt
-                            ).toLocaleString()}
-                          </p>
-
-                          <p className="email-body">
-                            {email.body}
-                          </p>
-
-                        </div>
-                      ))}
-
+                      {scheduledEmails.map((email) =>
+                        renderCard(email, 'Scheduled', email.scheduledAt, true)
+                      )}
                     </div>
                   )}
                 </>
               )}
 
-              {/* SENT EMAILS */}
+              {/* SENT */}
               {activeTab === 'Sent' && (
                 <>
                   <div className="section-header">
                     <h2>Sent Emails</h2>
-
-                    <span>
-                      {sentEmails.length} emails
-                    </span>
+                    <span>{sentEmails.length} emails</span>
                   </div>
 
-                  {sentEmails.length === 0 ? (
+                  {loading ? (
+                    <div className="empty-state">
+                      <p>Loading…</p>
+                    </div>
+                  ) : sentEmails.length === 0 ? (
                     <div className="empty-state">
                       <div className="empty-icon">📨</div>
-
                       <h3>No sent emails</h3>
-
-                      <p>
-                        Your sent emails will appear here.
-                      </p>
+                      <p>Your sent emails will appear here.</p>
                     </div>
                   ) : (
                     <div className="email-list">
-
-                      {sentEmails.map((email) => (
-                        <div
-                          className="email-card"
-                          key={email.id}
-                        >
-
-                          <div className="email-card-header">
-                            <strong>
-                              {email.subject}
-                            </strong>
-
-                            <span>
-                              {email.status}
-                            </span>
-                          </div>
-
-                          <p>
-                            <strong>To:</strong>{' '}
-                            {email.recipient}
-                          </p>
-
-                          <p>
-                            <strong>From:</strong>{' '}
-                            {email.senderId}
-                          </p>
-
-                          <p>
-                            <strong>Sent:</strong>{' '}
-                            {email.sentAt
-                              ? new Date(
-                                  email.sentAt
-                                ).toLocaleString()
-                              : 'N/A'}
-                          </p>
-
-                          <p className="email-body">
-                            {email.body}
-                          </p>
-
-                        </div>
-                      ))}
-
+                      {sentEmails.map((email) =>
+                        renderCard(email, 'Sent', email.sentAt, false)
+                      )}
                     </div>
                   )}
                 </>
               )}
-
             </section>
           </>
         )}
-
       </main>
     </div>
   )
