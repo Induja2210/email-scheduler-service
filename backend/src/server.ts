@@ -1,3 +1,7 @@
+process.on("uncaughtException", (e) => { console.error("UNCAUGHT:", e); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.error("REJECTION:", e); process.exit(1); });
+console.log("BOOT: server.ts starting");
+
 import emailRoutes from "./routes/emailRoutes";
 import express from "express";
 import cors from "cors";
